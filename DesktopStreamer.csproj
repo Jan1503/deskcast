@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>DeskCast</AssemblyName>
+    <RootNamespace>DesktopStreamer</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Authors>Jan Wrage</Authors>
+    <Description>Windows region/window capture that streams to a verpixeld-panel (PixPlane) or to verpixeld over TPM2.NET.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/Jan1503/deskcast</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="third_party\**" />
+    <EmbeddedResource Remove="third_party\**" />
+    <None Remove="third_party\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\pixplane\PixPlane.csproj" />
+    <ProjectReference Include="third_party\Tpm2Net\Tpm2Net.csproj" />
+  </ItemGroup>
+
+</Project>

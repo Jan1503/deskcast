@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+desktopstreamer.json
+.DS_Store
+Thumbs.db

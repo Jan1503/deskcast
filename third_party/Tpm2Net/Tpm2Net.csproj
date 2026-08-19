@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Tpm2Net</AssemblyName>
+    <RootNamespace>Tpm2Net</RootNamespace>
+    <Description>Legacy TPM2.NET / TPM2MAX.NET UDP streamer (DeskCast / verpixeld Network Stream Player). Feed a BGRA frame; no UI/graphics dependency.</Description>
+  </PropertyGroup>
+
+</Project>
