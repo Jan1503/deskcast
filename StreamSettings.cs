@@ -47,7 +47,8 @@ public sealed class StreamSettings
 
     /// <summary>
     ///     Per-column boundary/seam correction (host-side, in PixPlane). Defaults to the four
-    ///     scan-home boundary columns 63/127/191/255 with the tuned gain/lift. Edit in the JSON to taste.
+    ///     scan-home boundary columns 63/127/191/255 with the tuned gain/lift. Optional Knots
+    ///     (9-point 8-bit remap) invert the nonlinear first-line; edit in the Seam window.
     /// </summary>
     public List<SeamColumn> Seam { get; set; } = BuildDefaultSeam();
 
