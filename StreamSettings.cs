@@ -19,6 +19,12 @@ public sealed class StreamSettings
     public string Ip { get; set; } = "192.168.10.181";
     public int Port { get; set; } = 7777;
 
+    /// <summary>
+    ///     PixPlane receivers. Each one is a 256×128 crop at <see cref="StreamPanel.X"/>/<see cref="StreamPanel.Y"/>.
+    ///     Empty list falls back to <see cref="Ip"/> at the origin. Same origin on every panel = clone.
+    /// </summary>
+    public List<StreamPanel> Panels { get; set; } = [];
+
     /// <summary>UDP port for the legacy TPM2.NET path (verpixeld NetworkStreamPlayer default).</summary>
     public int Tpm2Port { get; set; } = 65506;
 
@@ -120,7 +126,47 @@ public sealed class StreamSettings
             }
         }
 
+        s.EnsurePanels();
         return s;
+    }
+
+    /// <summary>Make sure at least the legacy single IP exists as panel 1, and mirror it back into <see cref="Ip"/>.</summary>
+    public void EnsurePanels()
+    {
+        Panels ??= [];
+        Panels.RemoveAll(p => string.IsNullOrWhiteSpace(p.Host));
+        if (Panels.Count == 0)
+            Panels.Add(new StreamPanel { Host = Ip, Port = Port > 0 ? Port : 7777, X = 0, Y = 0, Enabled = true });
+
+        foreach (var p in Panels)
+        {
+            if (p.Port <= 0) p.Port = Port > 0 ? Port : 7777;
+            p.X = Math.Max(0, p.X);
+            p.Y = Math.Max(0, p.Y);
+        }
+
+        var first = Panels.FirstOrDefault(p => p.Enabled) ?? Panels[0];
+        Ip = first.Host.Trim();
+        Port = first.Port;
+    }
+
+    public IReadOnlyList<StreamPanel> ActivePanels()
+    {
+        EnsurePanels();
+        var active = Panels.Where(p => p.Enabled && !string.IsNullOrWhiteSpace(p.Host)).ToList();
+        return active.Count > 0 ? active : Panels;
+    }
+
+    /// <summary>Virtual wall in pixels. PixPlane = bounding box of the placed panels. TPM2 stays one 256×128 receiver.</summary>
+    public (int Width, int Height) WallSize()
+    {
+        if (string.Equals(Protocol, PanelSenderFactory.ProtocolTpm2, StringComparison.OrdinalIgnoreCase))
+            return (PanelWidth, PanelHeight);
+
+        var panels = ActivePanels();
+        var w = panels.Max(p => p.X + PanelWidth);
+        var h = panels.Max(p => p.Y + PanelHeight);
+        return (Math.Clamp(w, PanelWidth, 2048), Math.Clamp(h, PanelHeight, 1024));
     }
 
     public void Save()
@@ -141,4 +187,14 @@ public sealed class StreamSettings
 
     private static double ParseDouble(string value, double fallback) =>
         double.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : fallback;
+}
+
+/// <summary>One physical 256×128 panel on the virtual wall.</summary>
+public sealed class StreamPanel
+{
+    public string Host { get; set; } = "";
+    public int Port { get; set; } = 7777;
+    public int X { get; set; }
+    public int Y { get; set; }
+    public bool Enabled { get; set; } = true;
 }

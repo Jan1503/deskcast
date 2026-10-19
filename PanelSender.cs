@@ -42,6 +42,108 @@ public sealed class PixPlaneSender : IPanelSender
     public void Dispose() => _inner.Dispose();
 }
 
+/// <summary>
+///     One PixPlane streamer per physical panel. The capture is the virtual wall; each panel
+///     receives its own 256×128 crop. Same origin on every panel clones the top-left tile.
+/// </summary>
+public sealed class PixPlaneWallSender : IPanelSender
+{
+    private const int PanelW = StreamSettings.PanelWidth;
+    private const int PanelH = StreamSettings.PanelHeight;
+    private readonly Slot[] _slots;
+
+    public PixPlaneWallSender(StreamSettings s)
+    {
+        var (w, h) = s.WallSize();
+        Width = w;
+        Height = h;
+        var color = s.ToColor();
+        var seam = s.Seam ?? [];
+        _slots = s.ActivePanels().Select(p => new Slot(
+            new PanelStreamer(new PanelStreamOptions
+            {
+                Host = p.Host,
+                Port = p.Port > 0 ? p.Port : s.Port,
+                TargetMbps = s.TargetMbps,
+                ColorBits = s.ColorBits,
+                WallWidth = PanelW,
+                WallHeight = PanelH,
+                Color = color,
+                Seam = seam
+            }), p.X, p.Y)).ToArray();
+    }
+
+    public int Width { get; }
+    public int Height { get; }
+    public bool SupportsSeam => true;
+    public string? Diagnostics => null;
+
+    public void SendFrameBgra(ReadOnlySpan<byte> bgra, int strideBytes)
+    {
+        if (_slots.Length == 1 && _slots[0].X == 0 && _slots[0].Y == 0
+            && Width == PanelW && Height == PanelH)
+        {
+            _slots[0].Streamer.SendFrameBgra(bgra, strideBytes);
+            return;
+        }
+
+        for (var i = 0; i < _slots.Length; i++)
+        {
+            var slot = _slots[i];
+            Crop(bgra, strideBytes, Width, Height, slot.X, slot.Y, slot.Crop);
+            slot.Streamer.SendFrameBgra(slot.Crop, PanelW * 4);
+        }
+    }
+
+    public void UpdateColor(PanelColorSettings color)
+    {
+        foreach (var slot in _slots) slot.Streamer.UpdateColor(color);
+    }
+
+    public void UpdateSeam(IReadOnlyList<SeamColumn> seam)
+    {
+        foreach (var slot in _slots) slot.Streamer.UpdateSeam(seam);
+    }
+
+    public void Dispose()
+    {
+        foreach (var slot in _slots) slot.Streamer.Dispose();
+    }
+
+    private static void Crop(ReadOnlySpan<byte> src, int stride, int frameW, int frameH,
+        int originX, int originY, byte[] dst)
+    {
+        dst.AsSpan().Clear();
+        var rowBytes = PanelW * 4;
+        for (var y = 0; y < PanelH; y++)
+        {
+            var sy = originY + y;
+            if ((uint)sy >= (uint)frameH) continue;
+            var sx = originX;
+            var dx = 0;
+            var copy = PanelW;
+            if (sx < 0)
+            {
+                dx = -sx;
+                copy -= dx;
+                sx = 0;
+            }
+
+            if (sx >= frameW || copy <= 0) continue;
+            if (sx + copy > frameW) copy = frameW - sx;
+            src.Slice(sy * stride + sx * 4, copy * 4).CopyTo(dst.AsSpan(y * rowBytes + dx * 4, copy * 4));
+        }
+    }
+
+    private sealed class Slot(PanelStreamer streamer, int x, int y)
+    {
+        public PanelStreamer Streamer { get; } = streamer;
+        public int X { get; } = x;
+        public int Y { get; } = y;
+        public byte[] Crop { get; } = new byte[PanelW * PanelH * 4];
+    }
+}
+
 /// <summary>Legacy TPM2.NET streamer (verpixeld NetworkStreamPlayer / any TPM2 receiver).</summary>
 public sealed class Tpm2PanelSender : IPanelSender
 {
@@ -88,17 +190,7 @@ public static class PanelSenderFactory
             });
         }
 
-        return new PixPlaneSender(new PanelStreamOptions
-        {
-            Host = s.Ip,
-            Port = s.Port,
-            TargetMbps = s.TargetMbps,
-            ColorBits = s.ColorBits,
-            WallWidth = StreamSettings.PanelWidth,
-            WallHeight = StreamSettings.PanelHeight,
-            Color = s.ToColor(),
-            Seam = s.Seam ?? []
-        });
+        return new PixPlaneWallSender(s);
     }
 
     internal static Tpm2ColorSettings ToTpm2(PanelColorSettings c) => new()

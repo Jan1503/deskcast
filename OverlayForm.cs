@@ -91,7 +91,8 @@ public sealed class OverlayForm : Form
     protected override void OnLoad(EventArgs e)
     {
         base.OnLoad(e);
-        SizeToPanel(StreamSettings.PanelWidth, StreamSettings.PanelHeight);
+        var wall = _settings.WallSize();
+        SizeToPanel(wall.Width, wall.Height);
         LayoutHeaderButtons();
         UpdateCaptureRect();
         _running = true;
@@ -147,9 +148,9 @@ public sealed class OverlayForm : Form
             g.FillRectangle(b, 0, Header - 1, w, 1);                     // header underline
         }
 
-        var port = string.Equals(_settings.Protocol, PanelSenderFactory.ProtocolTpm2, StringComparison.OrdinalIgnoreCase)
-            ? _settings.Tpm2Port : _settings.Port;
-        var text = $"{_settings.Ip}:{port}   {_statusLine}   {Interlocked.Read(ref _frames)}f";
+        var wall = _settings.WallSize();
+        var panels = _settings.ActivePanels().Count;
+        var text = $"{panels} panel{(panels == 1 ? "" : "s")} {wall.Width}×{wall.Height}   {_statusLine}   {Interlocked.Read(ref _frames)}f";
         using var f = new Font("Segoe UI", 8f);
         using var tb = new SolidBrush(Color.Gainsboro);
         g.DrawString(text, f, tb, 6, 5);
@@ -373,6 +374,8 @@ public sealed class OverlayForm : Form
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
         dlg.Apply();
         _settings.Save();
+        var wall = _settings.WallSize();
+        SizeToPanel(wall.Width, wall.Height);
         RebuildSender();
     }
 
